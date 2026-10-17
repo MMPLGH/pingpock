@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping Pock - Red Social Privada</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- PeerJS para comunicación Cloud P2P directa entre dispositivos -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        ping: {
+                            50: '#f0fdfa',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                        },
+                        pock: {
+                            500: '#f43f5e',
+                            600: '#e11d48',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(51, 65, 85, 0.8);
+            border-radius: 9999px;
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #a855f7 0%, #eab308 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #a855f7 0%, #eab308 100%);
+        }
+        .ping-pulse {
+            animation: pulse-glow 2s infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(168, 85, 247, 0.4); }
+            50% { box-shadow: 0 0 25px rgba(234, 179, 8, 0.6); }
+        }
+        /* Estilo para el ícono de globo split morado (izquierda) y amarillo (derecha) */
+        .globe-logo-icon {
+            background: linear-gradient(90deg, #a855f7 0%, #a855f7 50%, #eab308 50%, #eab308 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body class="h-full font-sans antialiased bg-slate-950 text-slate-100 flex flex-col overflow-x-hidden selection:bg-ping-500 selection:text-white">
+
+    <div id="loginModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md transition-opacity duration-300">
+        <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden ping-pulse">
+            <div class="absolute -top-12 -left-12 w-32 h-32 bg-purple-500/20 rounded-full blur-2xl"></div>
+            <div class="absolute -bottom-12 -right-12 w-32 h-32 bg-yellow-500/20 rounded-full blur-2xl"></div>
+
+            <div class="relative z-10 text-center">
+                <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-slate-950 border border-slate-800 mb-4 shadow-lg shadow-purple-500/20">
+                    <i class="fa-solid fa-earth-americas text-4xl globe-logo-icon"></i>
+                </div>
+                <h1 class="text-3xl font-extrabold tracking-tight gradient-text mb-2">Ping Pock</h1>
+                <p class="text-slate-400 text-sm mb-6">Conéctate globalmente, comparte tus pings y sincroniza con cualquier dispositivo.</p>
+
+                <form id="loginForm" onsubmit="window.handleLogin(event)" class="space-y-4 text-left">
+                    <!-- User Profile Saved Banner (shown when user profile is remembered) -->
+                    <div id="savedUserNotice" class="hidden items-center justify-between p-3 bg-slate-800/90 border border-ping-500/40 rounded-xl mb-2">
+                        <div class="flex items-center gap-3">
+                            <img id="savedUserAvatar" src="" class="w-10 h-10 rounded-full object-cover border border-ping-500">
+                            <div>
+                                <p class="text-xs font-bold text-slate-100" id="savedUserName"></p>
+                                <p class="text-[10px] text-slate-400">Perfil recordado en este dispositivo</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="window.resetStoredProfile()" class="text-[11px] text-pock-500 hover:underline">Cambiar</button>
+                    </div>
+
+                    <div id="usernameInputWrapper">
+                        <label for="usernameInput" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Tu Nombre o Usuario</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+                                <i class="fa-solid fa-at"></i>
+                            </span>
+                            <input type="text" id="usernameInput" required placeholder="Ej: AlexRider" 
+                                class="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700/80 rounded-xl focus:ring-2 focus:ring-ping-500 focus:border-transparent outline-none text-slate-100 placeholder-slate-500 text-sm transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="roomInput" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Nombre de la Sala Privada</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+                                <i class="fa-solid fa-network-wired"></i>
+                            </span>
+                            <input type="text" id="roomInput" required placeholder="Ej: MiGrupoSecreto" 
+                                class="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700/80 rounded-xl focus:ring-2 focus:ring-ping-500 focus:border-transparent outline-none text-slate-100 placeholder-slate-500 text-sm transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="passkeyInput" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2"><i class="fa-solid fa-lock text-ping-500 mr-1"></i> Clave de Seguridad Secreta</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+                                <i class="fa-solid fa-key"></i>
+                            </span>
+                            <input type="password" id="passkeyInput" required placeholder="Ingresa el PIN/Clave de la sala" 
+                                class="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700/80 rounded-xl focus:ring-2 focus:ring-ping-500 focus:border-transparent outline-none text-slate-100 placeholder-slate-500 text-sm transition">
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-1">Ingresa el código/clave secreta para sincronizar esa sala.</p>
+                    </div>
+
+                    <div id="avatarPickerWrapper">
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Elige tu Avatar o Sube una Foto</label>
+                        <div class="space-y-3">
+                            <!-- Custom Photo Upload Button & Preview -->
+                            <div class="flex items-center gap-3 p-3 bg-slate-800/60 border border-slate-700/80 rounded-xl">
+                                <div class="relative w-12 h-12 flex-shrink-0">
+                                    <img id="customAvatarPreview" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" 
+                                        class="w-12 h-12 rounded-xl object-cover border-2 border-ping-500 shadow-md">
+                                </div>
+                                <div class="flex-1">
+                                    <button type="button" onclick="document.getElementById('avatarFileInput').click()" 
+                                        class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold text-xs rounded-lg transition flex items-center gap-1.5">
+                                        <i class="fa-solid fa-upload text-ping-500"></i>
+                                        <span>Subir mi propia foto</span>
+                                    </button>
+                                    <p class="text-[10px] text-slate-400 mt-1">Sube una imagen desde tu equipo o móvil</p>
+                                </div>
+                                <input type="file" id="avatarFileInput" accept="image/*" class="hidden" onchange="window.handleCustomAvatarUpload(event)">
+                            </div>
+
+                            <p class="text-[11px] text-slate-400 font-medium">O elige uno del catálogo:</p>
+                            <div class="grid grid-cols-5 gap-2" id="avatarPickerContainer">
+                                <!-- JS Inject Avatars -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full mt-2 py-3.5 px-4 gradient-bg hover:opacity-95 text-white font-bold rounded-xl shadow-lg transition active:scale-[0.98] flex items-center justify-center gap-2">
+                        <span>Entrar a la Sala</span>
+                        <i class="fa-solid fa-shield-halved text-sm"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="appLayout" class="hidden flex-col min-h-screen">
+        <!-- Navigation Bar -->
+        <header class="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3 cursor-pointer" onclick="window.scrollToTop()">
+                    <div class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shadow-md shadow-purple-500/20">
+                        <i class="fa-solid fa-earth-americas text-2xl globe-logo-icon"></i>
+                    </div>
+                    <span class="text-xl font-extrabold tracking-tight gradient-text hidden sm:inline-block">Ping Pock</span>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="flex-1 max-w-md relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                        <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                    </span>
+                    <input type="text" id="searchInput" onkeyup="window.filterPosts(this.value)" placeholder="Buscar publicaciones, tags o usuarios..." 
+                        class="w-full pl-9 pr-4 py-2 bg-slate-800/70 border border-slate-700/60 rounded-full text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-ping-500 focus:bg-slate-800 transition placeholder-slate-500">
+                </div>
+
+                <!-- User Profile & Status Bar -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <button onclick="window.copyInviteLink()" title="Copiar enlace con código de red para compartir" class="flex items-center gap-1.5 px-3 py-1.5 bg-ping-500/20 hover:bg-ping-500/30 border border-ping-500/40 text-ping-400 text-xs font-semibold rounded-full transition">
+                        <i class="fa-solid fa-lock text-xs"></i>
+                        <span class="hidden md:inline">Compartir Clave de Sala</span>
+                    </button>
+
+                    <div id="connectionStatus" class="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium rounded-full">
+                        <span id="statusDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="statusText" class="hidden sm:inline">Red Privada</span>
+                    </div>
+
+                    <button onclick="window.toggleNotifications()" class="relative p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition">
+                        <i class="fa-solid fa-bell text-lg"></i>
+                        <span id="notifBadge" class="absolute top-1 right-1 w-2.5 h-2.5 bg-pock-500 rounded-full hidden"></span>
+                    </button>
+
+                    <div class="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 p-1.5 pr-3 rounded-full">
+                        <img id="navAvatar" src="" alt="Avatar" class="w-8 h-8 rounded-full object-cover border border-ping-500">
+                        <span id="navUsername" class="text-sm font-semibold text-slate-200 hidden sm:inline max-w-[100px] truncate"></span>
+                        <button onclick="window.logout()" title="Cerrar sesión" class="text-slate-400 hover:text-pock-500 ml-1 transition">
+                            <i class="fa-solid fa-right-from-bracket text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Sidebar Left -->
+            <aside class="hidden lg:block lg:col-span-3 space-y-6">
+                <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 text-center shadow-lg relative overflow-hidden">
+                    <div class="h-16 gradient-bg -mx-5 -mt-5 mb-10 opacity-75"></div>
+                    <div class="relative -mt-16 mb-3 inline-block">
+                        <img id="sideAvatar" src="" class="w-20 h-20 rounded-full object-cover border-4 border-slate-900 mx-auto shadow-md">
+                    </div>
+                    <h2 id="sideUsername" class="text-lg font-bold text-slate-100"></h2>
+                    <p id="sideTag" class="text-xs text-slate-400 mb-2"></p>
+                    <p id="sideRoom" class="text-[11px] text-ping-400 bg-ping-500/10 px-2 py-0.5 rounded-full inline-block mb-4 font-mono"></p>
+                    
+                    <div class="grid grid-cols-3 gap-2 py-3 border-y border-slate-800 text-center">
+                        <div>
+                            <span id="statPosts" class="block text-base font-bold text-slate-100">0</span>
+                            <span class="text-[10px] text-slate-400 uppercase tracking-wider">Pings</span>
+                        </div>
+                        <div>
+                            <span id="statPocks" class="block text-base font-bold text-slate-100">0</span>
+                            <span class="text-[10px] text-slate-400 uppercase tracking-wider">Pocks</span>
+                        </div>
+                        <div>
+                            <span id="statSaved" class="block text-base font-bold text-slate-100">0</span>
+                            <span class="text-[10px] text-slate-400 uppercase tracking-wider">Guardados</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-3 shadow-lg space-y-1">
+                    <button onclick="window.switchTab('feed')" id="tabFeedBtn" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-ping-500 bg-ping-500/10 transition">
+                        <i class="fa-solid fa-house text-lg"></i>
+                        <span>Feed Global en Vivo</span>
+                    </button>
+                    <button onclick="window.switchTab('saved')" id="tabSavedBtn" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition">
+                        <i class="fa-solid fa-bookmark text-lg"></i>
+                        <span>Guardados</span>
+                    </button>
+                    <button onclick="window.switchTab('myPosts')" id="tabMyPostsBtn" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition">
+                        <i class="fa-solid fa-user text-lg"></i>
+                        <span>Mis Publicaciones</span>
+                    </button>
+                </div>
+            </aside>
+
+            <main class="lg:col-span-6 space-y-6">
+
+                <!-- Stories Header -->
+                <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-notch text-ping-500 animate-spin"></i> Historias Ping
+                    </h3>
+                    <div class="flex gap-4 overflow-x-auto custom-scrollbar pb-2" id="storiesContainer">
+                        <!-- JS Inject Stories -->
+                    </div>
+                </div>
+
+                <!-- Create Post Box -->
+                <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 shadow-lg space-y-4">
+                    <div class="flex gap-3">
+                        <img id="createPostAvatar" src="" class="w-10 h-10 rounded-full object-cover">
+                        <div class="flex-1">
+                            <textarea id="postContent" rows="3" placeholder="¿Qué está pasando? Tira un Ping en tiempo real..." 
+                                class="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ping-500 resize-none text-slate-100 placeholder-slate-500"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Post Actions Bar -->
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="window.triggerMediaUpload()" class="p-2 text-slate-400 hover:text-ping-500 rounded-lg hover:bg-slate-800 transition text-sm flex items-center gap-1.5">
+                                <i class="fa-solid fa-image text-emerald-400"></i>
+                                <span class="hidden sm:inline text-xs">Imagen</span>
+                            </button>
+                            <button type="button" onclick="window.addTagPrompt()" class="p-2 text-slate-400 hover:text-pock-500 rounded-lg hover:bg-slate-800 transition text-sm flex items-center gap-1.5">
+                                <i class="fa-solid fa-hashtag text-pock-500"></i>
+                                <span class="hidden sm:inline text-xs">Etiqueta</span>
+                            </button>
+                        </div>
+
+                        <!-- Image Preview Badge -->
+                        <div id="mediaPreview" class="hidden items-center gap-2 bg-slate-800 px-3 py-1 rounded-full text-xs text-slate-300">
+                            <i class="fa-solid fa-file-image text-ping-500"></i>
+                            <span id="mediaFileName" class="max-w-[100px] truncate">Imagen cargada</span>
+                            <button onclick="window.removeMedia()" class="text-slate-400 hover:text-pock-500"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+
+                        <button id="submitBtn" onclick="window.submitPost()" class="px-5 py-2 gradient-bg hover:opacity-90 text-white font-bold text-sm rounded-xl shadow-md transition active:scale-95 flex items-center gap-2">
+                            <span>Ping!</span>
+                            <i class="fa-solid fa-paper-plane text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filter Header Info -->
+                <div id="feedTitle" class="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+                    <span>Publicaciones Recientes</span>
+                    <span id="postCount" class="text-ping-500">0 Pings</span>
+                </div>
+
+                <div id="postsFeed" class="space-y-4">
+                    <!-- Posts rendered by JS -->
+                </div>
+            </main>
+
+            <!-- Sidebar Right -->
+            <aside class="hidden lg:block lg:col-span-3 space-y-6">
+                <!-- Trending Hashtags -->
+                <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
+                    <h3 class="text-sm font-bold text-slate-100 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-fire text-pock-500"></i> Tendencias Ping
+                    </h3>
+                    <div class="space-y-3" id="trendsContainer">
+                        <!-- JS Inject Trends -->
+                    </div>
+                </div>
+
+                <!-- Suggested Users -->
+                <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
+                    <h3 class="text-sm font-bold text-slate-100 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-users text-ping-500"></i> Personas para seguir
+                    </h3>
+                    <div class="space-y-4" id="suggestedUsersContainer">
+                        <!-- JS Inject Suggested -->
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Notifications Drawer -->
+    <div id="notificationsBox" class="hidden fixed top-18 right-4 sm:right-20 z-50 w-80 sm:w-96 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4 space-y-3 max-h-96 overflow-y-auto custom-scrollbar">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <h4 class="text-sm font-bold text-slate-200">Notificaciones</h4>
+            <button onclick="window.clearNotifications()" class="text-xs text-slate-400 hover:text-ping-500">Limpiar</button>
+        </div>
+        <div id="notificationsList" class="space-y-2 text-xs">
+            <p class="text-slate-500 text-center py-4">No tienes notificaciones por el momento.</p>
+        </div>
+    </div>
+
+    <!-- Hidden Input for File Upload -->
+    <input type="file" id="imageInput" accept="image/*" class="hidden" onchange="window.handleImageSelect(event)">
+
+    <script>
+        // High-volume bubble sound synthesizer using Web Audio API
+        function playBubbleSound() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+
+                const playPop = (delay, freqStart, freqEnd, duration) => {
+                    setTimeout(() => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freqStart, ctx.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(freqEnd, ctx.currentTime + duration);
+
+                        // High volume gain (0.85) for clear audio feedback
+                        gain.gain.setValueAtTime(0.85, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+
+                        osc.start();
+                        osc.stop(ctx.currentTime + duration);
+                    }, delay);
+                };
+
+                // Burst of 4 rising tone bubbles
+                playPop(0, 300, 800, 0.08);
+                playPop(60, 450, 1100, 0.07);
+                playPop(130, 350, 950, 0.08);
+                playPop(200, 600, 1400, 0.1);
+            } catch (e) {
+                console.warn('Audio non-blocking exception:', e);
+            }
+        }
+
+        const AVATARS = [
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+            'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
+            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+            'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80'
+        ];
+        window.AVATARS = AVATARS;
+
+        let currentUser = null;
+        let selectedAvatar = AVATARS[0];
+        let currentTab = 'feed';
+        let currentTagFilter = null;
+        let currentImageBase64 = null;
+        let notifications = [];
+        let posts = [];
+        let userSavedPostIds = new Set();
+        let peer = null;
+        let peerConnections = [];
+        let roomCode = "pingpock_privada";
+        let roomPasskey = "";
+
+        const broadcastChannel = new BroadcastChannel('pingpock_local_sync');
+
+        window.handleCustomAvatarUpload = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                selectedAvatar = e.target.result;
+                const preview = document.getElementById('customAvatarPreview');
+                if (preview) {
+                    preview.src = selectedAvatar;
+                }
+                
+                // Unselect gallery avatar highlighted borders
+                const container = document.getElementById('avatarPickerContainer');
+                if (container) {
+                    Array.from(container.children).forEach(img => {
+                        img.classList.remove('border-ping-500', 'scale-105', 'shadow-md', 'shadow-ping-500/30');
+                        img.classList.add('border-slate-700', 'opacity-70');
+                    });
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+
+        function simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = (hash << 5) - hash + char;
+                hash |= 0;
+            }
+            return Math.abs(hash).toString(36);
+        }
+
+        function initP2PNetwork(roomId, passkey) {
+            roomCode = roomId || "pingpock_privada";
+            roomPasskey = passkey || "";
+            
+            const secretRoomHash = simpleHash(roomCode + "___" + roomPasskey);
+            const myPeerId = 'pp_' + secretRoomHash + '_' + Math.random().toString(36).substring(2, 7);
+
+            try {
+                if (peer) peer.destroy();
+                peer = new Peer(myPeerId);
+
+                peer.on('open', () => {
+                    const statusText = document.getElementById('statusText');
+                    if (statusText) statusText.innerText = `Sala Protegida: ${roomCode}`;
+                });
+
+                peer.on('connection', (conn) => {
+                    setupConnection(conn);
+                });
+
+                syncWithCloudPeers();
+            } catch(e) {
+                console.warn('P2P error:', e);
+            }
+        }
+
+        function setupConnection(conn) {
+            peerConnections.push(conn);
+
+            conn.on('open', () => {
+                conn.send({ type: 'SYNC_ALL_POSTS', posts: posts, passkey: roomPasskey });
+            });
+
+            conn.on('data', (data) => {
+                if (data.passkey !== roomPasskey) return;
+                if (data.type === 'SYNC_ALL_POSTS' || data.type === 'UPDATE_POSTS') {
+                    mergeAndApplyPosts(data.posts, data.author);
+                }
+            });
+
+            conn.on('close', () => {
+                peerConnections = peerConnections.filter(c => c !== conn);
+            });
+        }
+
+        function syncWithCloudPeers() {
+            broadcastChannel.onmessage = (event) => {
+                if (event.data && event.data.passkey === roomPasskey && event.data.posts) {
+                    mergeAndApplyPosts(event.data.posts, event.data.author);
+                }
+            };
+        }
+
+        function mergeAndApplyPosts(incomingPosts, author = null) {
+            if (!Array.isArray(incomingPosts)) return;
+            
+            const postMap = new Map();
+            posts.forEach(p => postMap.set(p.id, p));
+            let isNewPostReceived = false;
+
+            incomingPosts.forEach(p => {
+                if (!postMap.has(p.id)) {
+                    isNewPostReceived = true;
+                    postMap.set(p.id, p);
+                } else if (p.createdAt && p.createdAt >= (postMap.get(p.id).createdAt || 0)) {
+                    postMap.set(p.id, p);
+                }
+            });
+
+            posts = Array.from(postMap.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            savePostsToCache(posts);
+            window.renderPosts();
+            window.updateStats();
+
+            // Play bubble sound on receiving a new post from another user
+            if (isNewPostReceived && author && currentUser && author !== currentUser.name) {
+                playBubbleSound();
+                window.addNotification(`¡${author} publicó un nuevo Ping en tu sala privada!`);
+            }
+        }
+
+        function broadcastToAll(newAuthor = null) {
+            savePostsToCache(posts);
+            broadcastChannel.postMessage({ posts, author: newAuthor, passkey: roomPasskey });
+
+            peerConnections.forEach(conn => {
+                if (conn.open) {
+                    conn.send({ type: 'UPDATE_POSTS', posts, author: newAuthor, passkey: roomPasskey });
+                }
+            });
+
+            window.renderPosts();
+            window.updateStats();
+        }
+
+        function getStoredPosts() {
+            try {
+                const storageKey = 'pingpock_posts_' + simpleHash(roomCode + roomPasskey);
+                const stored = localStorage.getItem(storageKey);
+                return stored ? JSON.parse(stored) : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function savePostsToCache(data) {
+            try {
+                const storageKey = 'pingpock_posts_' + simpleHash(roomCode + roomPasskey);
+                localStorage.setItem(storageKey, JSON.stringify(data));
+            } catch (e) {}
+        }
+
+        window.renderAvatarPicker = function() {
+            const container = document.getElementById('avatarPickerContainer');
+            if (!container) return;
+            container.innerHTML = AVATARS.map((url, index) => `
+                <img src="${url}" onclick="window.selectAvatar('${url}', this)" 
+                    class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover cursor-pointer border-2 transition transform hover:scale-105 ${index === 0 ? 'border-ping-500 scale-105 shadow-md shadow-ping-500/30' : 'border-slate-700 opacity-70'}">
+            `).join('');
+        };
+
+        window.selectAvatar = function(url, element) {
+            selectedAvatar = url;
+            const preview = document.getElementById('customAvatarPreview');
+            if (preview) {
+                preview.src = url;
+            }
+            const container = document.getElementById('avatarPickerContainer');
+            if (!container) return;
+            Array.from(container.children).forEach(img => {
+                img.classList.remove('border-ping-500', 'scale-105', 'shadow-md', 'shadow-ping-500/30');
+                img.classList.add('border-slate-700', 'opacity-70');
+            });
+            element.classList.remove('border-slate-700', 'opacity-70');
+            element.classList.add('border-ping-500', 'scale-105', 'shadow-md', 'shadow-ping-500/30');
+        };
+
+        window.handleLogin = function(event) {
+            if (event) event.preventDefault();
+            
+            let storedUser = null;
+            try {
+                const savedProfile = localStorage.getItem('pingpock_saved_profile');
+                if (savedProfile) storedUser = JSON.parse(savedProfile);
+            } catch(e){}
+
+            const username = storedUser ? storedUser.name : document.getElementById('usernameInput').value.trim();
+            const avatar = storedUser ? storedUser.avatar : selectedAvatar;
+            const inputRoom = document.getElementById('roomInput').value.trim() || "pingpock_privada";
+            const inputPasskey = document.getElementById('passkeyInput').value.trim();
+
+            if (!username) {
+                alert("Debes escribir tu nombre de usuario.");
+                return;
+            }
+
+            if (!inputPasskey) {
+                alert("Debes ingresar la Clave de Seguridad de la sala.");
+                return;
+            }
+
+            // Save user profile permanently on this device
+            const profileToSave = { name: username, avatar: avatar };
+            localStorage.setItem('pingpock_saved_profile', JSON.stringify(profileToSave));
+
+            // Trigger bubble audio effect on login
+            playBubbleSound();
+
+            currentUser = {
+                name: username,
+                avatar: avatar,
+                room: inputRoom,
+                passkey: inputPasskey,
+                loginTime: Date.now()
+            };
+
+            const saved = localStorage.getItem('pingpock_saved_' + currentUser.name);
+            if (saved) {
+                try { userSavedPostIds = new Set(JSON.parse(saved)); } catch(e){}
+            }
+
+            document.getElementById('loginModal').classList.add('hidden');
+            document.getElementById('appLayout').classList.remove('hidden');
+            document.getElementById('appLayout').classList.add('flex');
+
+            document.getElementById('navAvatar').src = currentUser.avatar;
+            document.getElementById('navUsername').innerText = currentUser.name;
+            document.getElementById('sideAvatar').src = currentUser.avatar;
+            document.getElementById('sideUsername').innerText = currentUser.name;
+            document.getElementById('sideTag').innerText = '@' + currentUser.name.toLowerCase().replace(/\s+/g, '_');
+            document.getElementById('sideRoom').innerText = '🔒 Sala: ' + currentUser.room;
+            document.getElementById('createPostAvatar').src = currentUser.avatar;
+
+            roomCode = currentUser.room;
+            roomPasskey = currentUser.passkey;
+            
+            const cached = getStoredPosts();
+            posts = cached && cached.length > 0 ? cached : [
+                {
+                    id: 'post_priv_1',
+                    author: 'Sistema Ping Pock',
+                    avatar: AVATARS[0],
+                    content: `🔒 ¡Bienvenido a la Sala Privada "${currentUser.room}"!\n\nEsta sala está protegida con clave secreta. Solo quienes ingresen con esta misma Sala y Clave de Seguridad podrán sincronizar y leer tus Pings.`,
+                    pocks: 1,
+                    pockedBy: [],
+                    comments: [],
+                    createdAt: Date.now()
+                }
+            ];
+
+            initP2PNetwork(currentUser.room, currentUser.passkey);
+            window.renderSidebarWidgets();
+            window.renderPosts();
+            window.updateStats();
+            window.addNotification(`¡Conectado a la red privada "${currentUser.room}"!`);
+        };
+
+        window.checkSavedSession = function() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlRoom = urlParams.get('room');
+                if (urlRoom) {
+                    document.getElementById('roomInput').value = urlRoom;
+                }
+
+                // Check for permanently saved user profile
+                const savedProfile = localStorage.getItem('pingpock_saved_profile');
+                if (savedProfile) {
+                    const parsedProfile = JSON.parse(savedProfile);
+                    if (parsedProfile && parsedProfile.name) {
+                        document.getElementById('savedUserNotice').classList.remove('hidden');
+                        document.getElementById('savedUserNotice').classList.add('flex');
+                        document.getElementById('savedUserName').innerText = parsedProfile.name;
+                        document.getElementById('savedUserAvatar').src = parsedProfile.avatar || AVATARS[0];
+
+                        document.getElementById('usernameInputWrapper').classList.add('hidden');
+                        document.getElementById('avatarPickerWrapper').classList.add('hidden');
+                        
+                        document.getElementById('usernameInput').removeAttribute('required');
+                    }
+                }
+            } catch(e) {
+                console.warn("Session check error:", e);
+            }
+        };
+
+        window.resetStoredProfile = function() {
+            localStorage.removeItem('pingpock_saved_profile');
+            document.getElementById('savedUserNotice').classList.add('hidden');
+            document.getElementById('savedUserNotice').classList.remove('flex');
+            document.getElementById('usernameInputWrapper').classList.remove('hidden');
+            document.getElementById('avatarPickerWrapper').classList.remove('hidden');
+            document.getElementById('usernameInput').setAttribute('required', 'required');
+        };
+
+        window.logout = function() {
+            currentUser = null;
+            document.getElementById('appLayout').classList.add('hidden');
+            document.getElementById('appLayout').classList.remove('flex');
+            document.getElementById('loginModal').classList.remove('hidden');
+            
+            window.checkSavedSession();
+        };
+
+        window.submitPost = function() {
+            const content = document.getElementById('postContent').value.trim();
+            if (!content && !currentImageBase64) return;
+
+            playBubbleSound();
+
+            const newPost = {
+                id: 'post_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                author: currentUser.name,
+                avatar: currentUser.avatar,
+                content: content,
+                image: currentImageBase64,
+                pocks: 0,
+                pockedBy: [],
+                comments: [],
+                createdAt: Date.now()
+            };
+
+            posts.unshift(newPost);
+            document.getElementById('postContent').value = '';
+            window.removeMedia();
+
+            broadcastToAll(currentUser.name);
+        };
+
+        window.togglePock = function(postId) {
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
+
+            playBubbleSound();
+
+            if (!post.pockedBy) post.pockedBy = [];
+            const index = post.pockedBy.indexOf(currentUser.name);
+
+            if (index > -1) {
+                post.pockedBy.splice(index, 1);
+                post.pocks = Math.max(0, post.pocks - 1);
+            } else {
+                post.pockedBy.push(currentUser.name);
+                post.pocks++;
+            }
+
+            broadcastToAll();
+        };
+
+        window.addComment = function(postId, event) {
+            if (event.key !== 'Enter') return;
+            const input = event.target;
+            const text = input.value.trim();
+            if (!text) return;
+
+            playBubbleSound();
+
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
+
+            if (!post.comments) post.comments = [];
+            post.comments.push({
+                author: currentUser.name,
+                avatar: currentUser.avatar,
+                text: text,
+                time: 'Ahora'
+            });
+
+            input.value = '';
+            broadcastToAll();
+        };
+
+        window.toggleSave = function(postId) {
+            if (userSavedPostIds.has(postId)) {
+                userSavedPostIds.delete(postId);
+            } else {
+                userSavedPostIds.add(postId);
+            }
+
+            try {
+                localStorage.setItem('pingpock_saved_' + currentUser.name, JSON.stringify(Array.from(userSavedPostIds)));
+            } catch(e){}
+
+            window.renderPosts();
+            window.updateStats();
+        };
+
+        window.triggerMediaUpload = function() {
+            document.getElementById('imageInput').click();
+        };
+
+        window.handleImageSelect = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentImageBase64 = e.target.result;
+                document.getElementById('mediaFileName').innerText = file.name;
+                document.getElementById('mediaPreview').classList.remove('hidden');
+                document.getElementById('mediaPreview').classList.add('flex');
+            };
+            reader.readAsDataURL(file);
+        };
+
+        window.removeMedia = function() {
+            currentImageBase64 = null;
+            document.getElementById('imageInput').value = '';
+            document.getElementById('mediaPreview').classList.add('hidden');
+            document.getElementById('mediaPreview').classList.remove('flex');
+        };
+
+        window.addTagPrompt = function() {
+            const tag = prompt("Ingresa una etiqueta (sin el #):");
+            if (tag) {
+                const textarea = document.getElementById('postContent');
+                textarea.value += (textarea.value ? ' ' : '') + '#' + tag.trim().replace(/\s+/g, '');
+            }
+        };
+
+        window.filterByTag = function(tag) {
+            currentTagFilter = tag;
+            window.renderPosts();
+        };
+
+        window.clearFilter = function() {
+            currentTagFilter = null;
+            document.getElementById('searchInput').value = '';
+            window.renderPosts();
+        };
+
+        window.switchTab = function(tab) {
+            currentTab = tab;
+            ['Feed', 'Saved', 'MyPosts'].forEach(t => {
+                const btn = document.getElementById(`tab${t}Btn`);
+                if (btn) {
+                    btn.classList.remove('text-ping-500', 'bg-ping-500/10');
+                    btn.classList.add('text-slate-400');
+                }
+            });
+
+            const activeBtn = document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}Btn`);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-slate-400');
+                activeBtn.classList.add('text-ping-500', 'bg-ping-500/10');
+            }
+
+            window.renderPosts();
+        };
+
+        window.renderPosts = function() {
+            const feedContainer = document.getElementById('postsFeed');
+            if (!feedContainer) return;
+
+            let filtered = posts;
+
+            if (currentTab === 'saved') {
+                filtered = filtered.filter(p => userSavedPostIds.has(p.id));
+            } else if (currentTab === 'myPosts') {
+                filtered = filtered.filter(p => p.author === currentUser.name);
+            }
+
+            if (currentTagFilter) {
+                filtered = filtered.filter(p => p.content.includes('#' + currentTagFilter));
+            }
+
+            const searchVal = document.getElementById('searchInput')?.value.toLowerCase().trim();
+            if (searchVal) {
+                filtered = filtered.filter(p => 
+                    p.content.toLowerCase().includes(searchVal) || 
+                    p.author.toLowerCase().includes(searchVal)
+                );
+            }
+
+            document.getElementById('postCount').innerText = `${filtered.length} Pings`;
+
+            if (filtered.length === 0) {
+                feedContainer.innerHTML = `
+                    <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-8 text-center text-slate-400">
+                        <i class="fa-solid fa-comments text-3xl mb-3 text-slate-600"></i>
+                        <p class="text-sm font-medium">No hay publicaciones aquí todavía.</p>
+                        ${currentTagFilter ? `<button onclick="window.clearFilter()" class="mt-2 text-xs text-ping-500 underline">Quitar filtro #${currentTagFilter}</button>` : ''}
+                    </div>
+                `;
+                return;
+            }
+
+            feedContainer.innerHTML = filtered.map(post => {
+                const isPocked = post.pockedBy && post.pockedBy.includes(currentUser.name);
+                const isSaved = userSavedPostIds.has(post.id);
+                
+                // Formatear hashtags dentro del texto
+                const formattedContent = post.content.replace(/#(\w+)/g, '<span onclick="window.filterByTag(\'$1\')" class="text-ping-500 font-semibold cursor-pointer hover:underline">#$1</span>');
+
+                return `
+                    <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <img src="${post.avatar}" class="w-10 h-10 rounded-full object-cover border border-slate-700">
+                                <div>
+                                    <h4 class="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+                                        <span>${post.author}</span>
+                                        ${post.author === currentUser.name ? '<span class="text-[10px] bg-ping-500/20 text-ping-400 px-1.5 py-0.2 rounded">Tú</span>' : ''}
+                                    </h4>
+                                    <p class="text-[11px] text-slate-500">hace un momento</p>
+                                </div>
+                            </div>
+                            <button onclick="window.toggleSave('${post.id}')" class="text-slate-400 hover:text-yellow-400 transition">
+                                <i class="${isSaved ? 'fa-solid fa-bookmark text-yellow-400' : 'fa-regular fa-bookmark'}"></i>
+                            </button>
+                        </div>
+
+                        <p class="text-sm text-slate-200 whitespace-pre-line leading-relaxed">${formattedContent}</p>
+
+                        ${post.image ? `
+                            <div class="rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+                                <img src="${post.image}" class="w-full max-h-96 object-cover">
+                            </div>
+                        ` : ''}
+
+                        <!-- Action buttons -->
+                        <div class="flex items-center gap-6 pt-2 border-t border-slate-800/80 text-xs text-slate-400">
+                            <button onclick="window.togglePock('${post.id}')" class="flex items-center gap-1.5 transition ${isPocked ? 'text-pock-500 font-bold' : 'hover:text-pock-500'}">
+                                <i class="${isPocked ? 'fa-solid fa-heart' : 'fa-regular fa-heart'} text-sm"></i>
+                                <span>${post.pocks || 0} Pocks</span>
+                            </button>
+                            <div class="flex items-center gap-1.5">
+                                <i class="fa-regular fa-comment text-sm"></i>
+                                <span>${(post.comments && post.comments.length) || 0} Comentarios</span>
+                            </div>
+                        </div>
+
+                        <!-- Comments Section -->
+                        <div class="space-y-2 pt-2">
+                            ${(post.comments || []).map(c => `
+                                <div class="flex gap-2 text-xs bg-slate-800/40 p-2.5 rounded-xl border border-slate-800">
+                                    <img src="${c.avatar}" class="w-6 h-6 rounded-full object-cover">
+                                    <div class="flex-1">
+                                        <div class="flex items-center justify-between mb-0.5">
+                                            <span class="font-bold text-slate-200">${c.author}</span>
+                                            <span class="text-[10px] text-slate-500">${c.time}</span>
+                                        </div>
+                                        <p class="text-slate-300">${c.text}</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+
+                            <div class="relative pt-1">
+                                <input type="text" onkeydown="window.addComment('${post.id}', event)" placeholder="Escribe un comentario y presiona Enter..." 
+                                    class="w-full bg-slate-800/70 border border-slate-700/60 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ping-500 text-slate-100 placeholder-slate-500">
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        window.renderSidebarWidgets = function() {
+            // Stories
+            const stories = [
+                { name: 'Tu Historia', avatar: currentUser.avatar, isMe: true },
+                { name: 'Lucía', avatar: AVATARS[1] },
+                { name: 'Mateo', avatar: AVATARS[2] },
+                { name: 'Sofia', avatar: AVATARS[3] },
+                { name: 'Diego', avatar: AVATARS[4] }
+            ];
+
+            const storiesContainer = document.getElementById('storiesContainer');
+            if (storiesContainer) {
+                storiesContainer.innerHTML = stories.map(s => `
+                    <div class="flex flex-col items-center gap-1 min-w-[60px] cursor-pointer group">
+                        <div class="w-14 h-14 rounded-full p-0.5 ${s.isMe ? 'bg-slate-700' : 'gradient-bg'} transition transform group-hover:scale-105">
+                            <img src="${s.avatar}" class="w-full h-full rounded-full object-cover border-2 border-slate-900">
+                        </div>
+                        <span class="text-[10px] text-slate-300 truncate w-14 text-center">${s.name}</span>
+                    </div>
+                `).join('');
+            }
+
+            // Trends
+            const trends = [
+                { tag: 'PingPockGlobal', posts: '1.2k Pings' },
+                { tag: 'RedPrivada', posts: '850 Pings' },
+                { tag: 'Tech2026', posts: '430 Pings' },
+                { tag: 'Conectados', posts: '210 Pings' }
+            ];
+
+            const trendsContainer = document.getElementById('trendsContainer');
+            if (trendsContainer) {
+                trendsContainer.innerHTML = trends.map(t => `
+                    <div onclick="window.filterByTag('${t.tag}')" class="flex items-center justify-between cursor-pointer group p-1.5 rounded-lg hover:bg-slate-800/50 transition">
+                        <div>
+                            <p class="text-xs font-bold text-slate-200 group-hover:text-ping-500">#${t.tag}</p>
+                            <p class="text-[10px] text-slate-500">${t.posts}</p>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-[10px] text-slate-600 group-hover:text-slate-400"></i>
+                    </div>
+                `).join('');
+            }
+
+            // Suggested Users
+            const suggested = [
+                { name: 'Carlos_Dev', avatar: AVATARS[1] },
+                { name: 'Elena_Art', avatar: AVATARS[3] }
+            ];
+
+            const suggestedContainer = document.getElementById('suggestedUsersContainer');
+            if (suggestedContainer) {
+                suggestedContainer.innerHTML = suggested.map(u => `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <img src="${u.avatar}" class="w-8 h-8 rounded-full object-cover">
+                            <div>
+                                <h5 class="text-xs font-bold text-slate-200">${u.name}</h5>
+                                <p class="text-[10px] text-slate-500">Sugerido para ti</p>
+                            </div>
+                        </div>
+                        <button onclick="this.innerText='Siguiendo'; this.classList.replace('bg-ping-500/10', 'bg-slate-800'); this.classList.replace('text-ping-400', 'text-slate-400')" 
+                            class="px-2.5 py-1 bg-ping-500/10 text-ping-400 font-semibold text-[11px] rounded-lg border border-ping-500/30 hover:bg-ping-500/20 transition">
+                            Seguir
+                        </button>
+                    </div>
+                `).join('');
+            }
+        };
+
+        window.updateStats = function() {
+            const myPostsCount = posts.filter(p => p.author === currentUser.name).length;
+            const totalPocksReceived = posts.filter(p => p.author === currentUser.name).reduce((acc, p) => acc + (p.pocks || 0), 0);
+
+            document.getElementById('statPosts').innerText = myPostsCount;
+            document.getElementById('statPocks').innerText = totalPocksReceived;
+            document.getElementById('statSaved').innerText = userSavedPostIds.size;
+        };
+
+        window.copyInviteLink = function() {
+            const inviteInstructions = `🔒 Para unirte a mi sala privada en Ping Pock:\n1. Nombre de Sala: ${currentUser.room}\n2. Clave Secreta: ${currentUser.passkey}`;
+            
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = inviteInstructions;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            window.addNotification('¡Clave de Sala copiada al portapapeles!');
+            alert('¡Instrucciones de acceso copias al portapapeles!\n\nPásale a tus amigos el Nombre de la Sala (' + currentUser.room + ') y la Clave Secreta.');
+        };
+
+        window.addNotification = function(text) {
+            notifications.unshift({ text, time: 'Ahora' });
+            const notifBadge = document.getElementById('notifBadge');
+            if (notifBadge) notifBadge.classList.remove('hidden');
+
+            const list = document.getElementById('notificationsList');
+            if (list) {
+                list.innerHTML = notifications.map(n => `
+                    <div class="p-2 bg-slate-800/80 rounded-lg border border-slate-700/50">
+                        <p class="text-slate-200">${n.text}</p>
+                        <span class="text-[10px] text-slate-500">${n.time}</span>
+                    </div>
+                `).join('');
+            }
+        };
+
+        window.toggleNotifications = function() {
+            const box = document.getElementById('notificationsBox');
+            box.classList.toggle('hidden');
+            const notifBadge = document.getElementById('notifBadge');
+            if (notifBadge) notifBadge.classList.add('hidden');
+        };
+
+        window.clearNotifications = function() {
+            notifications = [];
+            const list = document.getElementById('notificationsList');
+            if (list) {
+                list.innerHTML = '<p class="text-slate-500 text-center py-4">No tienes notificaciones por el momento.</p>';
+            }
+        };
+
+        window.scrollToTop = function() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        window.filterPosts = function() {
+            window.renderPosts();
+        };
+
+        // Window startup initialization
+        window.onload = function() {
+            window.renderAvatarPicker();
+            window.checkSavedSession();
+        };
+    </script>
+</body>
+</html>
